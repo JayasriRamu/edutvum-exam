@@ -13,6 +13,7 @@ import { User, UserRole, EMPTY_USER } from './user';
 import { AnswerType } from 'app/model/answer-type';
 import { GeneralContext } from 'app/model/general-context';
 import { QuestionGroup } from 'app/model/question-group';
+import { Comment } from 'app/model/comment';
 
 // NOTE: Not used anywhere but in tests, just for sample testing
 export function isin<T>(arr: Array<T>, val: T): boolean {
@@ -39,6 +40,7 @@ export enum ExamEditType {
   ExamNotes,
   QuestionChoicesAll,
   QuestionGroupDisplay,
+  ExamMarkingScheme,
   UNKNOWN_LAST // Just tag the end?
 }
 
@@ -213,17 +215,30 @@ export class DataService {
     })
   }
 
-  public pauseExam(): Promise<ExamResult> {
+  public pauseExam(): Promise<boolean> {
     this.globalTimerAction = null
     return this.saveExam()
   }
 
-  public saveExam(): Promise<ExamResult> {
+  public saveExam(): Promise<boolean> {
     // DO NOT LOCK!
     let call = u => this.dataSource.updateExam(u, this.pendingResult)
     return this.withUserPromise(call, ok => {
       // console.log(this.pendingResult.id, 'exam saved!')
-      return this.pendingResult
+      return ok
+    })
+  }
+
+  public saveExamAdmin(fn: (u: User) => void = (u) => { }): Promise<boolean> {
+    // DO NOT LOCK!
+    let r = this.pendingResult
+    let call = u => {
+      fn(u)
+      return this.dataSource.updateExam(r.user, this.pendingResult)
+    }
+    return this.withUserPromise(call, ok => {
+      console.log(this.pendingResult.id, 'saved as admin!')
+      return ok
     })
   }
 
@@ -296,6 +311,17 @@ export class DataService {
   public editExamNotes(diff: any, eid: string): Promise<boolean> {
     return this.editExamDetail(diff, eid, ExamEditType.ExamNotes)
   }
+  public editExamMarkingScheme(diff: any, eid: string): Promise<boolean> {
+    return this.editExamDetail(diff, eid, ExamEditType.ExamMarkingScheme)
+  }
+
+  public addComment(title: string, qidn: number): Promise<boolean> {
+    let addCommentInternally = (u: User) => {
+      let comment = new Comment(title, new Date(), u)
+      this.pendingResult.addComment(qidn, comment)
+    }
+    return this.saveExamAdmin(addCommentInternally)
+  }
 
   public pendingId(eid: string) {
     return eid + '.pending'
@@ -310,7 +336,14 @@ export class DataService {
     this.results.splice(0, 0, er)
   }
 
+  validateExamId(eid: string) {
+    if (!(/^[A-Za-z0-9]+$/i.test(eid))) throw new Error('Invaid: ' + eid + ' - Only alphanumeric')
+    let exam = this.cache[eid]
+    if (exam != null) throw new Error('Duplicate: ' + eid + ' - ' + exam.title)
+  }
+
   defineExam(eid: string): Promise<boolean> {
+    this.validateExamId(eid)
     let qid = eid + 'q01'
     let newQuestion = new Question(qid, 'New Question', AnswerType.MCQ,
       ['Choice 1', 'Choice 2'], [0], 'Question Notes:', 'Question Explanation', eid)

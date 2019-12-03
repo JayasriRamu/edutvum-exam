@@ -1,7 +1,4 @@
-<span (click)="clearAll()"
-    [class.hidden]="exam.isLocked()"
-    id="clear-all"
-    class="btn" >
+<span (click)="clearAll()" [class.hidden]="exam.isLocked()" id="clear-all" class="btn">
   Clear answers
 </span>
 
@@ -11,26 +8,20 @@
       <label [ngClass]="colors(i)">
         <label (click)="removeChoice(i)" class="lighter" [for]="'rd'+i" [innerHTML]="AAA[i]+'.'"></label>
         <sp></sp>
-        <input [type]="ctype" name="choices" [id]="'rd'+i" #first
-            (click)="choiceClicked($event, i)" [disabled]="exam.isLocked()"
-            [checked]="exam.isAnswer(qid, i)"
-            />
+        <input [type]="ctype" name="choices" [id]="'rd'+i" #first (click)="choiceClicked($event, i)"
+          [disabled]="exam.isLocked()" [checked]="exam.isAnswer(qid, i)" />
         <sp></sp>
-        <label class="opt" [for]="'rd'+i" >
-          <app-editor heading="Edit Choice Text"
-            [content]="ch"
-            (onedit)="editOption($event, i)" >
+        <label class="opt" [for]="'rd'+i">
+          <app-editor heading="Edit Choice Text" [content]="ch" (onedit)="editOption($event, i)">
           </app-editor>
         </label>
       </label>
     </div>
     <div class="ncq" *ngIf="question.type == 4">
       <div>Type your answer here:</div>
-      <input [(ngModel)]="ncqtext" type="number" name="choices"
-          [ngClass]="colors()" [disabled]="exam.isLocked()"
-        />
+      <input [(ngModel)]="ncqtext" type="number" name="choices" [ngClass]="colors()" [disabled]="exam.isLocked()" />
       <div *ngIf="exam.isLocked()" [class.correct]="true">
-      ({{exam.questions[qid].solutions[0]}})
+        ({{exam.questions[qid].solutions[0]}})
       </div>
     </div>
   </div>
@@ -38,31 +29,50 @@
     <button (click)="setNaqDone()" [class.hidden]="exam.isLocked()">Done</button>
   </div>
 </form>
-<hr>
-
-<div *ngIf="!lockedSuggestionEmpty()">
-  <mat-form-field class="suggestion-box" *ngIf="!exam.isLocked()">
-    <textarea matInput placeholder="Suggestion:" [(ngModel)]="suggestion" ></textarea>
-  </mat-form-field>
-  <div *ngIf="exam.isLocked()" class="suggestion-box-locked">{{ suggestion }}</div>
-  <hr>
-</div>
 
 <div *ngIf="service.isAdmin">
-  <br>
+  <hr>
   <button (click)="addChoice()">Add Choice</button>
   <br>
   <span style="color: red;">Solutions:</span>
-  <app-editor heading="Edit Question Solution"
-    [content]="solutions"
-    (onedit)="editSolution($event)" >
+  <app-editor heading="Edit Question Solution" [content]="solutions" (onedit)="editSolution($event)">
   </app-editor>
   <br>
-    <mat-form-field>
-      <mat-label>  <span style="color: red;">Type:</span>
-      </mat-label>
-      <mat-select [(value)]="type" (selectionChange)="editType($event.value)">
-          <mat-option *ngFor="let item of mytype" value={{item}}>{{item}}</mat-option>
-      </mat-select>             
-    </mat-form-field>    
+  <mat-form-field>
+    <mat-label> <span style="color: red;">Type:</span> </mat-label>
+    <mat-select [(value)]="type" (selectionChange)="editType($event.value)">
+      <mat-option *ngFor="let item of mytype" value={{item}}>{{item}}</mat-option>
+    </mat-select>
+  </mat-form-field>
+  <div *ngIf="!isPending">
+    <br>
+    <button (click)="toggleOmission()" class="btn btn-danger">
+      <span *ngIf="!omission">Omit Question</span>
+      <span *ngIf="omission"><b>Cancel Omission</b></span>
+    </button>
+    <div class="ncq" *ngIf="canEditMarks">
+      <div style="color: red;">Admin: Marks:</div>
+      <list *ngIf="schemeOLD" [(value)]="marks" [array]="['Correct','Wrong']"></list>
+      <smallint *ngIf="!schemeOLD"
+          [(value)]="marks" [min]="0" [max]="exam.questions[qid].solutions[0]"></smallint>
+    </div>
+  </div>
+</div>
+
+<hr>
+<div>
+  <div style="color: coral;">Comments:</div>
+  <app-editor1 heading="Add Comment" [content]="newcomment" (onedit)="addComment($event)">
+  </app-editor1>
+  <div>
+    <div *ngFor="let c of comments; let i=index">
+      <span class="comment-box-title">{{ c.title }}</span>
+      <sp></sp>
+      <sp></sp>
+      <span class="comment-box-user">{{ c.user }}</span>
+      <sp></sp>
+      <sp></sp>
+      <span class="comment-box-when" title="{{ formatWhen(c.when) }}">{{ showWhen(c.when) }}</span>
+    </div>
+  </div>
 </div>

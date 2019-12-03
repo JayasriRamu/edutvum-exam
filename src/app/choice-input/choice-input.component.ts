@@ -1,11 +1,15 @@
 import { Component, OnInit, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { ActivatedRoute, Router, Params } from '@angular/router';
 import { DataService, ExamEditType } from '../model/data.service';
-import { AnswerType,ANSWER_TYPE_NAMES } from '../model/answer-type';
+import { AnswerType, ANSWER_TYPE_NAMES } from '../model/answer-type';
 import { ExamResult, EMPTY_EXAM_RESULT } from '../model/exam-result';
 import { Question, EMPTY_QUESTION } from '../model/question';
 import { Lib, KEY } from '../model/lib';
 import { GeneralContext } from 'app/model/general-context';
+import { Comment, CommentList } from 'app/model/comment';
+import * as moment from 'moment';
+import { ExamStatus } from 'app/model/exam';
+import { MarkingSchemeType } from 'app/model/marks';
 
 declare var MathJax: {
   Hub: {
@@ -26,10 +30,11 @@ export class ChoiceInputComponent implements OnInit {
   exam: ExamResult = EMPTY_EXAM_RESULT
   AAA = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
   solutions = ''
-  mytype=ANSWER_TYPE_NAMES
+  mytype = ANSWER_TYPE_NAMES
   type = 'MCQ'
+  newcomment = ''
 
-  @ViewChild('first') private elementRef: ElementRef;
+  @ViewChild('first', { static: true }) private elementRef: ElementRef;
 
   @HostListener('window:keydown', ['$event'])
   keyEvent(event: KeyboardEvent) {
@@ -44,7 +49,7 @@ export class ChoiceInputComponent implements OnInit {
     public service: DataService) { }
 
   ngOnInit() {
-      this.route.params.subscribe((params: Params) => {
+    this.route.params.subscribe((params: Params) => {
       let eid = params['eid']
       this.qid = params['qid']
       if (Lib.isNil(eid) || Lib.isNil(this.qid)) return
@@ -52,12 +57,22 @@ export class ChoiceInputComponent implements OnInit {
       this.question = this.service.getQuestion(eid, this.qid)
       this.setSolutions()
       this.setType()
+      this.setComment()
       MathJax.Hub.Queue(['Typeset', MathJax.Hub]);
     })
   }
 
   clearAll() {
     if (!this.exam.isLocked()) this.exam.clearAnswers(+this.qid)
+  }
+
+  get isPending(): boolean {
+    return this.exam.exam.status === ExamStatus.PENDING && this.service.isAdmin
+  }
+
+  setComment() {
+    let cl = this.exam.commentLists[+this.qid]
+    this.newcomment = '#' + (cl == null ? 0 : cl.length)
   }
 
   setSolutions() {
@@ -104,27 +119,78 @@ export class ChoiceInputComponent implements OnInit {
   get ncqtext(): string {
     return this.getAnswer(0) + ''
   }
-
   set ncqtext(t: string) {
     this.exam.setAnswer(+this.qid, +t)
     this.service.saveExam()
   }
 
-  get suggestion(): string {
-    return this.exam.suggestions[+this.qid]
+  get canEditMarks(): boolean {
+    return this.question.type == 5 && this.exam.isLocked()
+  }
+  get schemeOLD(): boolean {
+    return this.exam.exam.markingScheme === 0
   }
 
-  lockedSuggestionEmpty(): boolean {
-    //CAUTION: '== null' (not ===) is required as it covers both undefined and null!
-    return this.exam.isLocked() && (this.suggestion == null || this.suggestion === "")
+  get marks(): number {
+    let ans = this.getAnswer(0)
+    return this.schemeOLD ? (ans == 0 ? 0 : 1) : ans
+  }
+  set marks(m: number) {
+    if (!this.service.isAdmin && !this.exam.isLocked()) return
+    try {
+      m = this.schemeOLD ? (m == 0 ? 0 : -1) : m
+      this.exam.setMarksAdminNAQ(+this.qid, m)
+      this.service.saveExamAdmin()
+    } catch (error) {
+      this.context.alert(error)
+    }
   }
 
-  set suggestion(s: string) {
-    this.exam.suggestions[+this.qid] = s
+  formatWhen(dt: Date): string {
+    return moment(dt).format('llll')
   }
 
-  setNaqDone(){
+  showWhen(dt: Date): string {
+    return moment(dt).fromNow();
+  }
+
+  get omission(): boolean {
+    return this.exam.isOmitted(+this.qid)
+  }
+
+  toggleOmission() {
+    if (!this.service.isAdmin && !this.exam.isLocked()) return
+    try {
+      this.exam.toggleOmission(+this.qid)
+      this.service.saveExamAdmin()
+    } catch (error) {
+      this.context.alert(error)
+    }
+  }
+
+  get comments(): CommentList {
+    let revChron = (a, b) => b.when.getTime() - a.when.getTime()
+    let list = this.exam.commentLists[+this.qid]
+    if (list) list = list.sort(revChron)
+    return list
+  }
+
+  addComment(newtext) {
+    try {
+      this.service.addComment(newtext, +this.qid).then(x => {
+        this.setComment()
+      })
+    } catch (error) {
+      console.log(newtext)
+      this.context.alert(error)
+    }
+  }
+
+  setNaqDone() {
     this.exam.setAnswer(+this.qid, 0)
+    if (this.exam.exam.markingScheme !== MarkingSchemeType.OLD) {
+      this.exam.setAnswer(+this.qid, this.exam.marks(+this.qid).max)
+    }
     this.service.saveExam()
   }
 
@@ -155,6 +221,9 @@ export class ChoiceInputComponent implements OnInit {
     try {
       this.question.setType(newtext)
       this.service.editQuestionType(newtext, +this.qid)
+      if (this.exam.exam.markingScheme !== MarkingSchemeType.OLD && newtext === 'NAQ') {
+        this.editSolution('[1]');
+      }
     } catch (error) {
       console.log(newtext)
       this.context.alert(error)

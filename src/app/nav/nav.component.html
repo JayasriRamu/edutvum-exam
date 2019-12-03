@@ -36,7 +36,21 @@
     </span>
   </div>
   <br>
+  <span *ngIf="service.isAdmin">
+    <mat-form-field>
+      <mat-label> <span style="color: red;">Marking Scheme:</span> </mat-label>
+      <mat-select [(value)]="markingScheme">
+        <mat-option value="OLD">OLD</mat-option>
+        <mat-option value="GENERAL">GENERAL</mat-option>
+        <mat-option value="NSEJS">NSEJS</mat-option>
+        <mat-option value="JEEMAIN">JEEMAIN</mat-option>
+        <mat-option value="NSEP">NSEP</mat-option>
+        <!-- <mat-option *ngFor="let sc of schemes;" value="sc">{{sc}}</mat-option> -->
+      </mat-select><sp></sp>
+    </mat-form-field>
+  </span>
   <div *ngIf="isPending">
+    <sp></sp><sp></sp>
     <button mat-raised-button (click)="addQuestion()">Add Question!</button>
     <button mat-raised-button class="gap" (click)="addLinkQuestion()">Add LINK Question!</button>
     <button mat-raised-button *ngIf="isResultsPage" class="gap" (click)="startGroup()">Add GROUP Question!</button>
@@ -45,17 +59,21 @@
   </div>
   <br>
   <div class="btn-toolbar" role="toolbar">
-    <span *ngFor="let q of exam.questions; let i=index"
-        class="btn-group btn btn-info nav-button nav-number" role="group"
+    <span *ngFor="let q of exam.questions; let i=index">
+      <span
+        class="btn btn-info nav-button nav-number" role="group"
         [class.locked]="exam.isLocked()"
+        [class.partial]="exam.isPartial(i)"
         [class.correct]="exam.isCorrect(i)"
         [class.guessing]="exam.guessings[i]"
         [class.attempted]="exam.isAttempted(i)"
+        [class.omitted]="exam.isOmitted(i)"
         [class.selected]="i == qidn"
         (click)="select(i)"
         id="b{{i}}"
         type="button">
         {{i+1}}
+      </span>
     </span>
     <span id="results" (click)="results()" [class.selected]="isResultsPage"
         class="btn btn-info nav-button">

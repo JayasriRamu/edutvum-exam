@@ -10,6 +10,7 @@ import { Exam } from './exam';
 import { User, UserRole } from './user';
 import { ExamResult } from './exam-result';
 import { QuestionGroup } from 'app/model/question-group';
+import { Comment } from 'app/model/comment';
 
 let createQ = (type: AnswerType, choices: string[], sols: number[], title = 'TEST Q...'): Question => {
   return new Question('00', title, type, choices, sols)

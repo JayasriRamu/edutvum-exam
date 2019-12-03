@@ -6,11 +6,11 @@ import { DataService } from 'app/model/data.service';
 import { Lib } from '../model/lib';
 
 @Component({
-  selector: 'app-editor',
-  templateUrl: './editor.component.html',
-  styleUrls: ['./editor.component.scss']
+  selector: 'app-editor1',
+  templateUrl: './editor1.component.html',
+  styleUrls: ['./editor1.component.scss']
 })
-export class EditorComponent {
+export class Editor1Component {
 
   @Input() heading = 'Edit Display'
   @Input() content = '[blank]'
@@ -25,7 +25,6 @@ export class EditorComponent {
 
   showEdit(event) {
     // if (!event.ctrlKey) return
-    if (!(this.service.isAdmin)) return
     this.backupContent = this.content
     this.showPopup = true
     this.service.disableHotkeys = true
@@ -48,7 +47,6 @@ export class EditorComponent {
   }
 
   edit() {
-    if (!(this.service.isAdmin)) return
     this.endEdit()
     this.onedit.emit(this.content);
   }

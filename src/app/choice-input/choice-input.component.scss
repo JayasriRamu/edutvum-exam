@@ -52,13 +52,22 @@ div {
   color: gray;
 }
 
-.suggestion-box {
+.comment-box {
   width: 90%;
   color: chocolate;
 }
 
-.suggestion-box-locked {
-  width: 90%;
+.comment-box-title {
   color: lightslategray;
   font-style: italic;
+}
+
+.comment-box-user {
+  color: lightcoral;
+  font-size: small;
+}
+
+.comment-box-when {
+  color: lightsteelblue;
+  font-size: small;
 }

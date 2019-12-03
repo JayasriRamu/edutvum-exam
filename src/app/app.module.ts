@@ -79,11 +79,15 @@ import { UserComponent } from './user/user.component';
 import { PopupComponent } from './popup/popup.component';
 
 import { SpaceComponent } from './common/sp.component';
+import { NumberInputComponent } from './common/num.component';
+import { SmallIntInputComponent } from './common/smallint.component';
+import { ListInputComponent } from './common/list.component';
 
 import { environment } from '../environments/environment';
 import { DetailsComponent } from './details/details.component';
 import { ChartComponent } from './chart/chart.component';
 import { EditorComponent } from './editor/editor.component';
+import { Editor1Component } from './editor1/editor1.component';
 import { MathJaxDirective } from './mathjax.directive';
 
 export const firebaseConfig = environment.firebaseConfig;
@@ -106,6 +110,7 @@ let SECURITY_SOURCE = environment.firebase ? FirebaseSecuritySource : MockSecuri
     AngularFireAuthModule,
     FlexLayoutModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatInputModule,
     MatSelectModule,
     MatRadioModule,
@@ -118,7 +123,7 @@ let SECURITY_SOURCE = environment.firebase ? FirebaseSecuritySource : MockSecuri
     MatChipsModule,
     MatTabsModule,
     MatCheckboxModule
-//    IupacModule,
+    //    IupacModule,
   ],
   declarations: [
     AppComponent,
@@ -135,8 +140,12 @@ let SECURITY_SOURCE = environment.firebase ? FirebaseSecuritySource : MockSecuri
     ChartComponent,
     PopupComponent,
     EditorComponent,
+    Editor1Component,
     MathJaxDirective,
     SpaceComponent,
+    NumberInputComponent,
+    SmallIntInputComponent,
+    ListInputComponent,
   ],
   providers: [
     { provide: GeneralContext, useClass: GeneralContextImpl },

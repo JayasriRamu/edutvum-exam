@@ -14,6 +14,8 @@ import { ExamResult } from './exam-result';
 import { User, UserRole } from './user';
 import { FirebaseAPI } from 'app/model/firebase-api.service';
 import { QuestionGroup } from 'app/model/question-group';
+import { CommentList, Comment } from './comment';
+import { MarkingSchemeType } from './marks';
 
 const URL_VER = 'ver5/'
 const EXAMS_URL = URL_VER + 'exams/'
@@ -58,7 +60,7 @@ export function createA(type: AnswerType, given): string[] {
       break;
     case AnswerType.NAQ:
       choices = []
-      break;  
+      break;
   }
   return choices
 }
@@ -117,11 +119,27 @@ export function createE(obj): Exam {
   qkeys.forEach(key => questions.push(...createQ(qobj[key], key, id)))
   let status = ExamStatus.DONE
   if (obj.status) status = ExamStatus['' + obj.status]
-  return new Exam(id, title, questions, when, notes, explanation, status)
+  let markingScheme = MarkingSchemeType.OLD
+  if (obj.markingscheme) markingScheme = MarkingSchemeType['' + obj.markingscheme]
+  return new Exam(id, title, questions, when, notes, explanation, status, markingScheme)
 }
 
 // NOTE: PUBLIC for TEST sake ONLY
-export function createR(obj, es: { [key: string]: Exam }): ExamResult {
+export function asCList(obj): CommentList {
+  if (Lib.isNil(obj)) return []
+  let arr = []
+  Object.keys(obj).forEach(function (key, index) {
+    let cl = obj[key]
+    //CAUTION: This typecasting is essential. Typescript is unaware, till last moment.
+    cl.when = new Date(cl.when)
+    arr[index] = cl
+    // console.log(index, key, obj[key].file, arr[index].file)
+  })
+  return arr
+}
+
+// NOTE: PUBLIC for TEST sake ONLY
+export function createR(obj, es: { [key: string]: Exam }, user: User): ExamResult {
   let id = obj.$key
   let exam = es[obj.exam]
   let title = exam.title
@@ -135,13 +153,16 @@ export function createR(obj, es: { [key: string]: Exam }): ExamResult {
   let dobj = obj.durations
   let durations: number[] = []
   if (dobj) exam.questions.forEach((q, i) => durations[i] = dobj[q.id])
-  let sobj = obj.suggestions
-  let suggestions: string[] = []
-  if (sobj) exam.questions.forEach((q, i) => suggestions[i] = sobj[q.id])
+  let clobj = obj.commentlists
+  let commentlists: CommentList[] = []
+  if (clobj) exam.questions.forEach((q, i) => commentlists[i] = asCList(clobj[q.id]))
+  let oobj = obj.omissions
+  let omissions: boolean[] = []
+  if (oobj) exam.questions.forEach((q, i) => omissions[i] = oobj[q.id])
   let status = ExamStatus.DONE
   if (obj.status) status = ExamStatus['' + obj.status]
   if (status !== ExamStatus.DONE) console.log('status', id, obj.status)
-  return new ExamResult(id, title, when, exam, answers, status, guessings, durations, suggestions)
+  return new ExamResult(id, title, when, exam, answers, status, guessings, durations, commentlists, user, omissions)
 }
 
 // NOTE: PUBLIC for TEST sake ONLY
@@ -180,7 +201,32 @@ export function convertPureExam(exam: Exam, user: User): any {
   exam.questions.forEach(q => qs[q.id] = convertQuestion(q))
   eo['questions'] = qs
   eo['status'] = ExamStatus[exam.status]
+  eo['markingscheme'] = MarkingSchemeType[exam.markingScheme]
   return eo
+}
+
+// NOTE: PUBLIC for TEST sake ONLY
+export function convertComment(comment: Comment): any {
+  let co = {}
+  co['title'] = comment.title
+  co['when'] = comment.when.toISOString()
+  if (comment.user) {
+    co['user'] = comment.user.name
+    co['uid'] = comment.user.uid
+  } else {
+    //NOTE: Maybe due to older comments?
+    console.log('WARNING: No user!', comment)
+  }
+  //console.log(JSON.stringify(co))
+  return co
+}
+
+// NOTE: PUBLIC for TEST sake ONLY
+export function convertCommentList(commentList: CommentList): any {
+  let clo = []
+  commentList.forEach(c => clo.push(convertComment(c)));
+  //console.log(JSON.stringify(clo))
+  return clo
 }
 
 // NOTE: PUBLIC for TEST sake ONLY
@@ -194,8 +240,10 @@ export function convertExamResult(result: ExamResult): any {
   result.guessings.forEach((isGuess: boolean, i) => roguss[qs[i].id] = isGuess)
   let rodurs = ro['durations'] = {}
   result.durations.forEach((secs: number, i) => rodurs[qs[i].id] = secs)
-  let rosugs = ro['suggestions'] = {}
-  result.suggestions.forEach((sugs: string, i) => rosugs[qs[i].id] = sugs)
+  let rocls = ro['commentlists'] = {}
+  result.commentLists.forEach((cls: CommentList, i) => rocls[qs[i].id] = convertCommentList(cls))
+  let roomis = ro['omissions'] = {}
+  result.omissions.forEach((isOmitted: boolean, i) => roomis[qs[i].id] = isOmitted)
   ro['when'] = result.when.getTime()
   ro['revwhen'] = -result.when.getTime()
   ro['status'] = result.isLocked() ? 'DONE' : 'PENDING'
@@ -241,7 +289,7 @@ export class FirebaseDataSource implements DataSource {
   private async fetchR(user: User): Promise<void> {
     let robjs = await this.afbapi.listFirstMapR(this.resultsUrl(user))
     fbObjToArr(robjs).forEach(
-      r => this.holders.results.push(createR(r, this.alles))
+      r => this.holders.results.push(createR(r, this.alles, user))
     )
   }
 
@@ -289,6 +337,7 @@ export class FirebaseDataSource implements DataSource {
       case ExamEditType.ExamNotes: return editurl + '/notes/'
       case ExamEditType.QuestionChoicesAll: return editurl + '/choices/'
       case ExamEditType.QuestionGroupDisplay: return editurl + '/display/'
+      case ExamEditType.ExamMarkingScheme: return editurl + '/markingscheme/'
       default:
         console.log('editUrl', 'Unknown type', type)
         return null

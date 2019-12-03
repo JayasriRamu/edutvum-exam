@@ -1,8 +1,11 @@
 import { AnswerType } from './answer-type';
 import { Exam, ExamStatus, EMPTY_EXAM } from './exam';
-import { Question, EMPTY_QUESTION } from './question';
-import { Score, EMPTY_SCORE } from 'app/model/score';
+import { Question } from './question';
 import { Lib } from '../model/lib';
+import { CommentList, Comment } from './comment';
+import { EMPTY_USER, User } from './user';
+import { Score } from './score';
+import { GeneralMarker, Marker, MarkingSchemeType, Marks } from './marks';
 
 export class ExamResult extends Exam {
   private _secondsTotal = 0
@@ -12,7 +15,9 @@ export class ExamResult extends Exam {
     status: ExamStatus = ExamStatus.PENDING,
     public guessings: boolean[] = [],
     readonly durations: number[] = [],
-    readonly suggestions: string[] = [],
+    readonly commentLists: CommentList[] = [],
+    readonly user: User = EMPTY_USER,
+    public omissions: boolean[] = [],
   ) {
     super(id, title, exam.questions, when, '', '', status)
     this._secondsTotal = durations.filter(x => !Lib.isNil(x)).reduce((t, s) => t + s, 0)
@@ -56,7 +61,7 @@ export class ExamResult extends Exam {
         break
       case AnswerType.NAQ:
         Lib.failif(alen > 1, 'NAQ cannot have more than one answer', ctx)
-      break 
+        break
     }
   }
 
@@ -113,7 +118,7 @@ export class ExamResult extends Exam {
         break;
       case AnswerType.NAQ:
         this.answers[qid] = [n]
-         break; 
+        break;
       default:
         Lib.failif(true, 'This should never execute!')
         break;
@@ -145,20 +150,67 @@ export class ExamResult extends Exam {
     return true
   }
 
-  public score(): Score {
-    let correct = 0
-    let wrong = 0
-    this.answers.forEach((ans, qid) => {
-      if (ans !== undefined) {
+  public isPartial(qid: number): boolean {
+    // no answers so not correct (also, solutions can never be empty)
+    if (!this.isAttempted(qid)) return false
+    if (this.exam.markingScheme === MarkingSchemeType.OLD) return false
+    if (this.questions[qid].type !== AnswerType.NAQ) return false
+    let total = this.questions[qid].solutions[0]
+    let mark = this.answers[qid][0]
+    return mark < total && mark > 0
+  }
+
+  public isOmitted(qid: number): boolean {
+    let curr = false
+    if (this.omissions) curr = this.omissions[qid]
+    return curr
+  }
+
+  public toggleOmission(qid: number) {
+    this.omissions[qid] = !this.isOmitted(qid)
+  }
+
+  public setMarksAdminNAQ(qid: number, marks: number) {
+    let q = this.questions[qid]
+    let max = q.solutions[0]
+    Lib.failif(marks > max, 'Marks cannot be more than max')
+    this.answers[qid] = [marks]
+  }
+
+  public addComment(qid: number, c: Comment) {
+    let cl = this.commentLists[qid]
+    if (!cl) cl = this.commentLists[qid] = []
+    cl.push(c)
+  }
+
+  public marks(qid: number): Marks {
+    let q = this.questions[qid]
+    let sol = q.solutions
+    let ans = this.answers[qid]
+    return Marker.get(this.exam.markingScheme).marks(q.type, sol, ans)
+  }
+
+  public get score(): Score {
+    let sc = new Score()
+    let total = 0
+    this.questions.forEach((q, qid) => {
+      let marks = this.marks(qid)
+      if (!this.omissions[qid]) {
+        sc.total += marks.max
         if (this.isAttempted(qid)) {
-          if (this.isCorrect(qid)) correct++
-          else wrong++
+          if (this.guessings[qid]) sc.guess += marks.value
+          else sc.sure += marks.value
+        } else {
+          sc.skipped += marks.max
+          marks.value = 0 // NOTE: would be null otherwise
         }
+      } else {
+        sc.omitted += marks.max
       }
     })
-    let total = this.questions.length
-    return new Score(total, correct, wrong)
+    return sc
   }
+
 }
 
 export const EMPTY_EXAM_RESULT = new ExamResult('00', 'Bingo', new Date(), EMPTY_EXAM)
